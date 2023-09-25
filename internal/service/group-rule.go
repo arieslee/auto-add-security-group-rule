@@ -48,9 +48,6 @@ func (s *sGroupRule) GetIp(ctx context.Context) (string, error) {
 	return ip, nil
 }
 func (s *sGroupRule) Input(ctx context.Context) error {
-	outputSuccess := func(ctx context.Context, msg string) {
-		color.Green(msg)
-	}
 	s.Cmd.Ip = gcmd.Scan("Please input your ip(defaults to the current public ip):")
 	if s.Cmd.Ip == "" {
 		clientIP, err := s.GetIp(ctx)
@@ -134,20 +131,28 @@ func (s *sGroupRule) ParseCmd(ctx context.Context) error {
 	}
 	return s.Input(ctx)
 }
-
+func outputError(ctx context.Context, msg string) {
+	color.Red(msg)
+}
+func outputSuccess(ctx context.Context, msg string) {
+	color.Green(msg)
+}
+func pause(ctx context.Context) {
+	gcmd.Scan("Press any key to exit...")
+}
 func (s *sGroupRule) Add(ctx context.Context) {
 	err := s.ParseCmd(ctx)
 	if err != nil {
-		outputError := func(ctx context.Context, msg string) {
-			color.Red(msg)
-		}
 		outputError(ctx, err.Error())
+		pause(ctx)
 		return
 	}
 	clientIP := s.Cmd.Ip
 	client, err := ecs.NewClientWithAccessKey(s.Cmd.RegionId, s.Cmd.AccessKeyId, s.Cmd.AccessSecret)
 	if err != nil {
-		fmt.Print(err.Error())
+		outputError(ctx, err.Error())
+		pause(ctx)
+		return
 	}
 	request := ecs.CreateAuthorizeSecurityGroupRequest()
 	request.Scheme = s.Cmd.Scheme
@@ -162,8 +167,9 @@ func (s *sGroupRule) Add(ctx context.Context) {
 
 	response, err := client.AuthorizeSecurityGroup(request)
 	if err != nil {
-		fmt.Print(err.Error())
+		outputError(ctx, err.Error())
+		pause(ctx)
 		return
 	}
-	fmt.Printf("Response: %#v\nClient IP: %s  was successfully added to the Security Group.\n", response, clientIP)
+	outputSuccess(ctx, fmt.Sprintf("Response: %#v\nClient IP: %s  was successfully added to the Security Group.\n", response, clientIP))
 }
