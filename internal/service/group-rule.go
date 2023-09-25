@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ecs"
+	"github.com/fatih/color"
 	"github.com/gogf/gf/v2/encoding/gjson"
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/os/gcmd"
@@ -47,53 +48,76 @@ func (s *sGroupRule) GetIp(ctx context.Context) (string, error) {
 	return ip, nil
 }
 func (s *sGroupRule) Input(ctx context.Context) error {
-	s.Cmd.Ip = gcmd.Scan("Please input your ip(defaults to the current public ip):\n")
-	s.Cmd.StartPort = gcmd.Scan("Please input startPort:\n")
+	outputSuccess := func(ctx context.Context, msg string) {
+		color.Green(msg)
+	}
+	s.Cmd.Ip = gcmd.Scan("Please input your ip(defaults to the current public ip):")
+	if s.Cmd.Ip == "" {
+		clientIP, err := s.GetIp(ctx)
+		if err != nil {
+			fmt.Printf("cant get public ip,err=%s", err.Error())
+			return err
+		}
+		s.Cmd.Ip = clientIP
+	}
+	outputSuccess(ctx, "your ip is : "+s.Cmd.Ip)
+	s.Cmd.StartPort = gcmd.Scan("Please input startPort:")
 	if s.Cmd.StartPort == "" {
 		return errors.New("startPort cant be empty")
 	}
-	s.Cmd.EndPort = gcmd.Scan("Please input endPort:\n")
+	outputSuccess(ctx, "your startPort is : "+s.Cmd.StartPort)
+	s.Cmd.EndPort = gcmd.Scan("Please input endPort:")
 	if s.Cmd.EndPort == "" {
 		s.Cmd.EndPort = s.Cmd.StartPort
 	}
-	s.Cmd.AccessKeyId = gcmd.Scan("Please input your accessKeyId:\n")
+	outputSuccess(ctx, "your endPort is : "+s.Cmd.EndPort)
+	s.Cmd.AccessKeyId = gcmd.Scan("Please input your accessKeyId:")
 	if s.Cmd.AccessKeyId == "" {
 		return errors.New("accessKeyId cant be empty")
 	}
-	s.Cmd.AccessSecret = gcmd.Scan("Please input your accessSecret:\n")
+	outputSuccess(ctx, "your accessKeyId is : "+s.Cmd.AccessKeyId)
+	s.Cmd.AccessSecret = gcmd.Scan("Please input your accessSecret:")
 	if s.Cmd.AccessSecret == "" {
 		return errors.New("accessSecret cant be empty")
 	}
-	s.Cmd.RegionId = gcmd.Scan("Please input regionId(e.g. cn-beijing):\n")
+	outputSuccess(ctx, "your accessSecret is : "+s.Cmd.AccessSecret)
+	s.Cmd.RegionId = gcmd.Scan("Please input regionId(e.g. cn-beijing):")
 	if s.Cmd.RegionId == "" {
 		return errors.New("regionId cant be empty")
 	}
-	s.Cmd.GroupId = gcmd.Scan("Please input groupId:\n")
+	outputSuccess(ctx, "your regionId is : "+s.Cmd.RegionId)
+	s.Cmd.GroupId = gcmd.Scan("Please input groupId:")
 	if s.Cmd.GroupId == "" {
 		return errors.New("groupId cant be empty")
 	}
-	s.Cmd.Scheme = gcmd.Scan("Please input scheme(default https):\n")
+	outputSuccess(ctx, "your groupId is : "+s.Cmd.GroupId)
+	s.Cmd.Scheme = gcmd.Scan("Please input scheme(default https):")
 	if s.Cmd.Scheme == "" {
 		s.Cmd.Scheme = "https"
 	}
-	s.Cmd.Protocol = gcmd.Scan("Please input protocol(default tcp):\n")
+	outputSuccess(ctx, "your scheme is : "+s.Cmd.Scheme)
+	s.Cmd.Protocol = gcmd.Scan("Please input protocol(default tcp):")
 	if s.Cmd.Protocol == "" {
 		s.Cmd.Protocol = "tcp"
 	}
-	s.Cmd.Policy = gcmd.Scan("Please input policy(default accept. options: accept、drop):\n")
-	if s.Cmd.Protocol == "" {
-		s.Cmd.Protocol = "accept"
+	outputSuccess(ctx, "your protocol is : "+s.Cmd.Protocol)
+	s.Cmd.Policy = gcmd.Scan("Please input policy(default accept. options: accept、drop):")
+	if s.Cmd.Policy == "" {
+		s.Cmd.Policy = "accept"
 	}
-	s.Cmd.NicType = gcmd.Scan("Please input nicType(default internet. options: internet、intranet):\n")
+	outputSuccess(ctx, "your policy is : "+s.Cmd.Policy)
+	s.Cmd.NicType = gcmd.Scan("Please input nicType(default internet. options: internet、intranet):")
 	if s.Cmd.NicType == "" {
 		s.Cmd.NicType = "internet"
 	}
-	s.Cmd.Description = gcmd.Scan("Please input description(allow empty):\n")
+	outputSuccess(ctx, "your nicType is : "+s.Cmd.NicType)
+	s.Cmd.Description = gcmd.Scan("Please input description(allow empty):")
 	if s.Cmd.Description == "" {
 		s.Cmd.Description = gtime.Now().Format("Y-m-d H:i:s added rule")
 	}
+	outputSuccess(ctx, "your description is : "+s.Cmd.Description)
 	jsonStr, _ := gjson.EncodeString(s.Cmd)
-	gfile.PutContents(JsonFile, jsonStr)
+	_ = gfile.PutContents(JsonFile, jsonStr)
 	return nil
 }
 func (s *sGroupRule) ParseCmd(ctx context.Context) error {
@@ -105,28 +129,22 @@ func (s *sGroupRule) ParseCmd(ctx context.Context) error {
 			data := gfile.GetContents(JsonFile)
 			gconv.Scan(data, &s.Cmd)
 		} else {
-			s.Input(ctx)
+			return s.Input(ctx)
 		}
-	} else {
-		s.Input(ctx)
 	}
-	return nil
+	return s.Input(ctx)
 }
 
 func (s *sGroupRule) Add(ctx context.Context) {
 	err := s.ParseCmd(ctx)
 	if err != nil {
-		fmt.Println(err.Error())
+		outputError := func(ctx context.Context, msg string) {
+			color.Red(msg)
+		}
+		outputError(ctx, err.Error())
 		return
 	}
 	clientIP := s.Cmd.Ip
-	if clientIP == "" {
-		clientIP, err = s.GetIp(ctx)
-		if err != nil {
-			fmt.Print(err.Error())
-			return
-		}
-	}
 	client, err := ecs.NewClientWithAccessKey(s.Cmd.RegionId, s.Cmd.AccessKeyId, s.Cmd.AccessSecret)
 	if err != nil {
 		fmt.Print(err.Error())
