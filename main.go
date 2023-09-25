@@ -6,6 +6,5 @@ import (
 )
 
 func main() {
-	ctx := gctx.GetInitCtx()
-	service.GroupRule.Add(ctx)
+	service.GroupRule.Add(gctx.GetInitCtx())
 }
